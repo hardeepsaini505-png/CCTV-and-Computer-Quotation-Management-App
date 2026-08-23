@@ -460,102 +460,183 @@ class _HomePageState extends State<HomePage> {
     final result = await showDialog<List<QuoteItem>>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
-          title: const Text('Quotation Items'),
-          content: SizedBox(
-            width: 900,
-            height: 560,
-            child: Column(
-              children: [
-                const Row(
-                  children: [
-                    Expanded(flex: 5, child: Text('ITEM NAME')),
-                    SizedBox(width: 10),
-                    SizedBox(width: 100, child: Text('UNIT')),
-                    SizedBox(width: 10),
-                    SizedBox(width: 90, child: Text('QTY')),
-                    SizedBox(width: 10),
-                    SizedBox(width: 120, child: Text('RATE')),
-                    SizedBox(width: 48),
-                  ],
-                ),
-                const Divider(),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: rows.length,
-                    itemBuilder: (_, i) {
-                      final r = rows[i];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          children: [
-                            Expanded(child: field(r['n']!, 'Item Name')),
-                            const SizedBox(width: 10),
-                            SizedBox(width: 100, child: field(r['u']!, 'Unit')),
-                            const SizedBox(width: 10),
-                            SizedBox(width: 90, child: field(r['q']!, 'Qty', TextInputType.numberWithOptions(decimal: true))),
-                            const SizedBox(width: 10),
-                            SizedBox(width: 120, child: field(r['r']!, 'Rate', TextInputType.numberWithOptions(decimal: true))),
-                            IconButton(
-                              onPressed: rows.length == 1 ? null : () {
-                                for (final key in ['n', 'u', 'q', 'r']) {
-                                  r[key]!.dispose();
-                                }
-                                rows.removeAt(i);
-                                setD(() {});
-                              },
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      rows.add({
-                        'n': TextEditingController(),
-                        'u': TextEditingController(text: 'Nos'),
-                        'q': TextEditingController(text: '1'),
-                        'r': TextEditingController(text: '0'),
-                      });
-                      setD(() {});
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Item'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () {
-                final result = <QuoteItem>[];
-                for (final r in rows) {
-                  final name = r['n']!.text.trim();
-                  if (name.isEmpty) continue;
-                  result.add(
-                    QuoteItem(
-                      name: name,
-                      unit: r['u']!.text.trim().isEmpty ? 'Nos' : r['u']!.text.trim(),
-                      qty: double.tryParse(r['q']!.text.trim()) ?? 0,
-                      rate: double.tryParse(r['r']!.text.trim()) ?? 0,
+      builder: (ctx) {
+        final screen = MediaQuery.of(ctx).size;
+        final mobile = screen.width < 650;
+
+        return StatefulBuilder(
+          builder: (ctx, setD) => AlertDialog(
+            title: const Text('Quotation Items'),
+            content: SizedBox(
+              width: mobile ? screen.width * 0.78 : 900,
+              height: mobile ? screen.height * 0.48 : 560,
+              child: Column(
+                children: [
+                  if (!mobile)
+                    const Row(
+                      children: [
+                        Expanded(flex: 5, child: Text('ITEM NAME')),
+                        SizedBox(width: 10),
+                        SizedBox(width: 100, child: Text('UNIT')),
+                        SizedBox(width: 10),
+                        SizedBox(width: 90, child: Text('QTY')),
+                        SizedBox(width: 10),
+                        SizedBox(width: 120, child: Text('RATE')),
+                        SizedBox(width: 48),
+                      ],
                     ),
-                  );
-                }
-                Navigator.pop(ctx, result);
-              },
-              child: const Text('Save Items'),
+                  if (!mobile) const Divider(),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: rows.length,
+                      itemBuilder: (_, i) {
+                        final r = rows[i];
+
+                        if (mobile) {
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            child: Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: Column(
+                                children: [
+                                  field(r['n']!, 'Item Name'),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 2,
+                                        child: field(
+                                          r['q']!,
+                                          'Qty',
+                                          TextInputType.numberWithOptions(decimal: true),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        flex: 2,
+                                        child: field(
+                                          r['r']!,
+                                          'Rate',
+                                          TextInputType.numberWithOptions(decimal: true),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        tooltip: 'Delete',
+                                        onPressed: rows.length == 1
+                                            ? null
+                                            : () {
+                                                for (final key in ['n', 'u', 'q', 'r']) {
+                                                  r[key]!.dispose();
+                                                }
+                                                rows.removeAt(i);
+                                                setD(() {});
+                                              },
+                                        icon: const Icon(
+                                          Icons.delete_outline,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Expanded(child: field(r['n']!, 'Item Name')),
+                              const SizedBox(width: 10),
+                              SizedBox(
+                                width: 90,
+                                child: field(
+                                  r['q']!,
+                                  'Qty',
+                                  TextInputType.numberWithOptions(decimal: true),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              SizedBox(
+                                width: 120,
+                                child: field(
+                                  r['r']!,
+                                  'Rate',
+                                  TextInputType.numberWithOptions(decimal: true),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: rows.length == 1
+                                    ? null
+                                    : () {
+                                        for (final key in ['n', 'u', 'q', 'r']) {
+                                          r[key]!.dispose();
+                                        }
+                                        rows.removeAt(i);
+                                        setD(() {});
+                                      },
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        rows.add({
+                          'n': TextEditingController(),
+                          'u': TextEditingController(text: 'Nos'),
+                          'q': TextEditingController(text: '1'),
+                          'r': TextEditingController(text: '0'),
+                        });
+                        setD(() {});
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Item'),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-      ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final result = <QuoteItem>[];
+                  for (final r in rows) {
+                    final name = r['n']!.text.trim();
+                    if (name.isEmpty) continue;
+                    result.add(
+                      QuoteItem(
+                        name: name,
+                        unit: r['u']!.text.trim().isEmpty
+                            ? 'Nos'
+                            : r['u']!.text.trim(),
+                        qty: double.tryParse(r['q']!.text.trim()) ?? 0,
+                        rate: double.tryParse(r['r']!.text.trim()) ?? 0,
+                      ),
+                    );
+                  }
+                  Navigator.pop(ctx, result);
+                },
+                child: const Text('Save Items'),
+              ),
+            ],
+          ),
+        );
+      },
     );
 
     for (final r in rows) {
