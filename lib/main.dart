@@ -97,6 +97,23 @@ class QuoteItem {
       );
 }
 
+class SavedItem {
+  String name;
+  String category; // CCTV or Computer
+
+  SavedItem({required this.name, required this.category});
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'category': category,
+      };
+
+  factory SavedItem.fromJson(Map<String, dynamic> j) => SavedItem(
+        name: '${j['name'] ?? ''}',
+        category: '${j['category'] ?? 'CCTV'}',
+      );
+}
+
 class Quotation {
   String id, number, type, clientId, note, validity, terms;
   DateTime date;
@@ -166,6 +183,7 @@ class _HomePageState extends State<HomePage> {
 
   final clients = <Client>[];
   final quotations = <Quotation>[];
+  final savedItems = <SavedItem>[];
 
   bool loading = true;
 
@@ -210,6 +228,10 @@ class _HomePageState extends State<HomePage> {
           ..clear()
           ..addAll(((j['quotations'] as List?) ?? [])
               .map((e) => Quotation.fromJson(Map<String, dynamic>.from(e))));
+        savedItems
+          ..clear()
+          ..addAll(((j['items'] as List?) ?? [])
+              .map((e) => SavedItem.fromJson(Map<String, dynamic>.from(e))));
       } catch (_) {}
     }
 
@@ -237,6 +259,7 @@ class _HomePageState extends State<HomePage> {
       jsonEncode({
         'clients': clients.map((e) => e.toJson()).toList(),
         'quotations': quotations.map((e) => e.toJson()).toList(),
+        'items': savedItems.map((e) => e.toJson()).toList(),
       }),
     );
   }
@@ -438,7 +461,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<List<QuoteItem>?> itemsForm(List<QuoteItem> initial) async {
+  Future<List<QuoteItem>?> itemsForm(List<QuoteItem> initial, String category) async {
     final rows = initial
         .map((e) => {
               'n': TextEditingController(text: e.name),
@@ -486,6 +509,57 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   if (!mobile) const Divider(),
+                  if (savedItems.any((item) => item.category == category))
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final categoryItems = savedItems
+                              .where((item) => item.category == category)
+                              .toList();
+
+                          final selected = await showDialog<String>(
+                            context: ctx,
+                            builder: (pickCtx) => SimpleDialog(
+                              title: Text(
+                                'Select ${category == 'CCTV' ? 'CCTV' : 'Computer'} Part',
+                              ),
+                              children: categoryItems.isEmpty
+                                  ? [
+                                      const Padding(
+                                        padding: EdgeInsets.all(20),
+                                        child: Text(
+                                          'No parts saved in this list.',
+                                        ),
+                                      ),
+                                    ]
+                                  : categoryItems
+                                      .map(
+                                        (item) => SimpleDialogOption(
+                                          onPressed: () =>
+                                              Navigator.pop(pickCtx, item.name),
+                                          child: Text(item.name),
+                                        ),
+                                      )
+                                      .toList(),
+                            ),
+                          );
+                          if (selected != null) {
+                            rows.add({
+                              'n': TextEditingController(text: selected),
+                              'u': TextEditingController(text: 'Nos'),
+                              'q': TextEditingController(text: '1'),
+                              'r': TextEditingController(text: '0'),
+                            });
+                            setD(() {});
+                          }
+                        },
+                        icon: const Icon(Icons.list_alt),
+                        label: const Text('Add From Item List'),
+                      ),
+                    ),
+                  if (savedItems.any((item) => item.category == category))
+                    const SizedBox(height: 6),
                   Expanded(
                     child: ListView.builder(
                       itemCount: rows.length,
@@ -647,6 +721,215 @@ class _HomePageState extends State<HomePage> {
     return result;
   }
 
+  Future<void> itemMasterPage() async {
+    String category = 'CCTV';
+    final controller = TextEditingController();
+
+    Future<void> addItem(StateSetter setD, String cat) async {
+      controller.clear();
+      final name = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Add ${cat == 'CCTV' ? 'CCTV' : 'Computer'} Part'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Item / Part Name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final v = controller.text.trim();
+                if (v.isNotEmpty) Navigator.pop(ctx, v);
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      );
+      if (name == null) return;
+
+      if (savedItems.any((e) =>
+          e.category == cat && e.name.toLowerCase() == name.toLowerCase())) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('This item already exists')),
+          );
+        }
+        return;
+      }
+
+      savedItems.add(SavedItem(name: name, category: cat));
+      await save();
+      setD(() {});
+      if (mounted) setState(() {});
+    }
+
+    Future<void> editItem(int index, StateSetter setD) async {
+      controller.text = savedItems[index].name;
+      final cat = savedItems[index].category;
+      final name = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Update ${cat == 'CCTV' ? 'CCTV' : 'Computer'} Part'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Item / Part Name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final v = controller.text.trim();
+                if (v.isNotEmpty) Navigator.pop(ctx, v);
+              },
+              child: const Text('Update'),
+            ),
+          ],
+        ),
+      );
+      if (name == null) return;
+
+      if (savedItems.asMap().entries.any((e) =>
+          e.key != index &&
+          e.value.category == cat &&
+          e.value.name.toLowerCase() == name.toLowerCase())) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('This item already exists')),
+          );
+        }
+        return;
+      }
+
+      savedItems[index].name = name;
+      await save();
+      setD(() {});
+      if (mounted) setState(() {});
+    }
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) {
+          final size = MediaQuery.of(ctx).size;
+          final list = savedItems
+              .asMap()
+              .entries
+              .where((e) => e.value.category == category)
+              .toList();
+
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Expanded(child: Text('Item / Parts Master')),
+                IconButton(
+                  tooltip: 'Add Item',
+                  onPressed: () => addItem(setD, category),
+                  icon: const Icon(Icons.add_circle_outline),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: size.width < 650 ? size.width * .78 : 600,
+              height: size.height * .55,
+              child: Column(
+                children: [
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                        value: 'CCTV',
+                        icon: Icon(Icons.videocam_outlined),
+                        label: Text('CCTV Parts'),
+                      ),
+                      ButtonSegment(
+                        value: 'Computer',
+                        icon: Icon(Icons.computer_outlined),
+                        label: Text('Computer Parts'),
+                      ),
+                    ],
+                    selected: {category},
+                    onSelectionChanged: (v) {
+                      setD(() => category = v.first);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: list.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No ${category == 'CCTV' ? 'CCTV' : 'Computer'} parts added.\\nTap + to add.',
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: list.length,
+                            separatorBuilder: (_, __) =>
+                                const Divider(height: 1),
+                            itemBuilder: (_, i) {
+                              final actualIndex = list[i].key;
+                              final item = savedItems[actualIndex];
+                              return ListTile(
+                                title: Text(item.name),
+                                leading: CircleAvatar(
+                                  child: Text('${i + 1}'),
+                                ),
+                                trailing: Wrap(
+                                  children: [
+                                    IconButton(
+                                      tooltip: 'Update',
+                                      onPressed: () =>
+                                          editItem(actualIndex, setD),
+                                      icon: const Icon(Icons.edit),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Delete',
+                                      onPressed: () async {
+                                        if (await confirm(
+                                            'Delete "${item.name}"?')) {
+                                          savedItems.removeAt(actualIndex);
+                                          await save();
+                                          setD(() {});
+                                          if (mounted) setState(() {});
+                                        }
+                                      },
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    controller.dispose();
+  }
+
+
   Future<Quotation?> quotationForm({Quotation? old}) async {
     String type = old?.type ?? 'CCTV';
     String clientId = old?.clientId ?? (clients.isNotEmpty ? clients.first.id : '');
@@ -717,7 +1000,7 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: () async {
-                      final v = await itemsForm(items);
+                      final v = await itemsForm(items, type);
                       if (v != null) setD(() => items = v);
                     },
                     icon: const Icon(Icons.inventory_2_outlined),
@@ -1021,6 +1304,7 @@ class _HomePageState extends State<HomePage> {
       },
       'clients': clients.map((e) => e.toJson()).toList(),
       'quotations': quotations.map((e) => e.toJson()).toList(),
+      'items': savedItems.map((e) => e.toJson()).toList(),
     });
 
     try {
@@ -1058,6 +1342,11 @@ class _HomePageState extends State<HomePage> {
       quotations
         ..clear()
         ..addAll((j['quotations'] as List).map((e) => Quotation.fromJson(Map<String, dynamic>.from(e))));
+
+      savedItems
+        ..clear()
+        ..addAll(((j['items'] as List?) ?? [])
+            .map((e) => SavedItem.fromJson(Map<String, dynamic>.from(e))));
 
       final f = Map<String, dynamic>.from(j['firm'] ?? {});
       firmName = '${f['name'] ?? firmName}';
@@ -1311,6 +1600,11 @@ class _HomePageState extends State<HomePage> {
                                         onPressed: quotationList,
                                         icon: const Icon(Icons.history),
                                         label: const Text('Quotation History'),
+                                      ),
+                                      OutlinedButton.icon(
+                                        onPressed: itemMasterPage,
+                                        icon: const Icon(Icons.inventory_2_outlined),
+                                        label: const Text('Item Master'),
                                       ),
                                     ],
                                   ),
